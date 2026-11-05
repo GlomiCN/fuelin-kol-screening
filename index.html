@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Fuelin KOL Screening — DRAFT v4</title>
+<title>Fuelin KOL Screening — DRAFT v5</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root{--purple:#5B108B;--cyan:#00A0E0;--gold:#C9A227;--bg:#FFFFFF;--surface:#F8F5FC;--surface2:#F3EEF9;--deep:#FFFFFF;--line:#5B108B22;--txt:#1E1328;--mut:#6B5E78;--ok:#1B7A3E;--warn:#A66B00;--bad:#C62828;--ok-bg:#E6F6EC;--warn-bg:#FFF4D6;--bad-bg:#FDE8E8;--na-bg:#EEEAF2}
@@ -48,7 +48,7 @@ a,a:visited{color:var(--purple)}a:hover{color:#7A1BB8}
 <label>Jenis KOL</label><select id="jenis"><option value="nonkeranjang">Non Keranjang Kuning</option><option value="keranjang">Keranjang Kuning</option></select>
 <div id="platBox"><label>Platform</label><div class="chk"><label><input type="checkbox" id="cbIG" value="Instagram"> Instagram</label><label><input type="checkbox" id="cbTT" value="TikTok"> TikTok</label></div></div>
 <div id="krjFields" class="hide"><div class="row3"><div><label>GMV 30 hari (Rp)</label><input id="gmv" inputmode="numeric"></div><div><label>AOV (Rp, opsional)</label><input id="aov" inputmode="numeric"></div><div><label>Unit terjual 30 hari (opsional)</label><input id="units" inputmode="numeric"></div></div></div>
-<div class="actions"><button id="btnNext">Lanjutkan →</button></div>
+<div class="actions"><button id="btnNext">Lanjutkan →</button><button id="btnFetch">Tarik data otomatis via Apify</button></div><div class="hint" id="fetchMsg"></div>
 </div>
 <div class="grid hide" id="detail">
 <div class="card"><h2>Data Performa</h2>
@@ -73,6 +73,7 @@ a,a:visited{color:var(--purple)}a:hover{color:#7A1BB8}
 </section>
 
 <section id="tab-settings" class="hide"><div class="card"><h2>Pengaturan Aturan</h2>
+<div><label>URL proxy Apps Script (Apify)</label><input id="s_endpoint" placeholder="https://script.google.com/macros/s/.../exec" style="width:100%;padding:10px;border:1px solid #5B108B44;border-radius:8px"></div>
 <div class="row3">
 <div><label>CPV min / Deal Bagus (Rp per view)</label><input id="s_cpvMin" type="number" step="0.1"></div>
 <div><label>CPV max / Wajar (Rp per view)</label><input id="s_cpvMax" type="number" step="0.1"></div>
@@ -95,6 +96,7 @@ a,a:visited{color:var(--purple)}a:hover{color:#7A1BB8}
 const DEF={cpvMin:5,cpvMax:8,minData:5,gmvMin:1000000,erMin:2,postsMin:10,erFraud:20,incons:10,vfHigh:100,vfLow:1,erTT:'views',erIG:'followers',erYT:'views'};
 const $=id=>document.getElementById(id);
 let S=Object.assign({},DEF,JSON.parse(localStorage.getItem('fkol_settings')||'{}'));
+S.endpoint=localStorage.getItem('fkol_endpoint')||'https://script.google.com/macros/s/AKfycbydypy_0KeZOGA0UpyxS48FnsdsuuAOS_o8kCA2k92tUnrjHIy8mAyIU5S-y1inf406-w/exec';
 let roster=JSON.parse(localStorage.getItem('fkol_roster')||'[]');
 let type='nonkeranjang', last=null;
 const num=v=>{if(v==null)return NaN;const s=String(v).replace(/[^\d]/g,'');return s===''?NaN:Number(s)};
@@ -220,6 +222,39 @@ $('csvFile').onchange=e=>{const fl=e.target.files[0];if(!fl)return;fl.text().the
 const SK=Object.keys(DEF);
 function loadS(){SK.forEach(k=>$('s_'+k).value=S[k])}
 SK.forEach(k=>$('s_'+k).addEventListener('input',()=>{const v=$('s_'+k).value;S[k]=typeof DEF[k]==='number'?(v===''?DEF[k]:Number(v)):v;localStorage.setItem('fkol_settings',JSON.stringify(S));compute()}));
+$('s_endpoint').value=S.endpoint;
+$('s_endpoint').addEventListener('input',()=>{S.endpoint=$('s_endpoint').value.trim();localStorage.setItem('fkol_endpoint',S.endpoint)});
+// ---- v5: tarik data otomatis via Apify proxy ----
+const now30=new Date(Date.now()-30*864e5), now90=new Date(Date.now()-90*864e5);
+$('btnFetch').onclick=async()=>{
+ const {p,user}=parseLink($('link').value);
+ if(!S.endpoint){$('fetchMsg').textContent='Isi dulu URL proxy Apps Script di tab Pengaturan.';return}
+ if(p!=='Instagram'||!user){$('fetchMsg').textContent='Otomatis saat ini untuk link profil Instagram (mis. instagram.com/username).';return}
+ $('btnFetch').disabled=true;$('fetchMsg').textContent='Mengambil data @'+user+' via Apify… (±30–60 detik)';
+ try{
+  const r=await fetch(S.endpoint+'?url='+encodeURIComponent('https://www.instagram.com/'+user+'/'));const j=await r.json();
+  if(j.error)throw new Error(typeof j.error==='string'?j.error:'Gagal ambil data');
+  const pr=j.profile||{};const f=pr.followersCount??pr.followers;
+  const posts=(j.posts||[]).filter(x=>(x.productType==='clips'||x.type==='Video')&&new Date(x.timestamp)>=now90);
+  if(!posts.length)throw new Error('Tidak ada reels 90 hari terakhir');
+  if(!plats().includes('Instagram'))$('cbIG').checked=true;
+  switchTo('Instagram');active='Instagram';$('platform').value='Instagram';
+  $('handle').value='@'+user;$('followers').value=f??'';
+  $('postsMonth').value=(j.posts||[]).filter(x=>new Date(x.timestamp)>=now30).length;
+  const tb=document.querySelector('#posts tbody');
+  tb.innerHTML='';posts.slice(0,10).forEach((x,i)=>{
+   const v=x.videoPlayCount??x.videoViewCount??0,l=x.likesCount??0,c=x.commentsCount??0;
+   tb.insertAdjacentHTML('beforeend','<tr><td>'+(i+1)+'</td>'+['v','l','c','s'].map(k=>'<td><input data-k="'+k+'" data-i="'+i+'" inputmode="numeric"></td>').join('')+'<td class="er" id="er'+i+'">–</td></tr>');
+   const g=k=>tb.querySelector('input[data-k="'+k+'"][data-i="'+i+'"]');
+   g('v').value=v;g('l').value=l;g('c').value=c;g('s').value=0;
+  });
+  while(tb.rows.length<10){const i=tb.rows.length;tb.insertAdjacentHTML('beforeend','<tr><td>'+(i+1)+'</td>'+['v','l','c','s'].map(k=>'<td><input data-k="'+k+'" data-i="'+i+'" inputmode="numeric"></td>').join('')+'<td class="er" id="er'+i+'">–</td></tr>')}
+  document.querySelectorAll('#posts input').forEach(i=>i.addEventListener('input',compute));
+  $('detail').classList.remove('hide');compute();
+  $('fetchMsg').textContent='Berhasil: '+Math.min(10,posts.length)+' reels (90 hari terakhir) @'+user+'. Followers '+(f??'–');
+ }catch(err){$('fetchMsg').textContent='Gagal: '+err.message}
+ $('btnFetch').disabled=false;
+};
 $('btnReset').onclick=()=>{S=Object.assign({},DEF);localStorage.setItem('fkol_settings',JSON.stringify(S));loadS();compute()};
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x===b));['screen','roster','settings'].forEach(t=>$('tab-'+t).classList.toggle('hide',t!==b.dataset.tab));renderR()});
 loadS();compute();renderR();

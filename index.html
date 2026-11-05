@@ -53,7 +53,7 @@ html{overflow-x:hidden}body{overflow-x:hidden}
 <label>Jenis KOL</label><select id="jenis"><option value="nonkeranjang">Non Keranjang Kuning</option><option value="keranjang">Keranjang Kuning</option></select>
 <div id="platBox"><label>Platform</label><div class="chk"><label><input type="checkbox" id="cbIG" value="Instagram"> Instagram</label><label><input type="checkbox" id="cbTT" value="TikTok"> TikTok</label></div></div>
 <div id="krjFields" class="hide"><div class="row3"><div><label>GMV 30 hari (Rp)</label><input id="gmv" inputmode="numeric"></div><div><label>AOV (Rp, opsional)</label><input id="aov" inputmode="numeric"></div><div><label>Unit terjual 30 hari (opsional)</label><input id="units" inputmode="numeric"></div></div></div>
-<div class="actions"><button id="btnNext">Lanjutkan →</button><button id="btnFetch">Tarik data otomatis via Apify</button></div><div class="hint" id="fetchMsg"></div>
+<div class="actions"><button id="btnFetch">Lanjutkan</button></div><div class="hint" id="fetchMsg"></div>
 </div>
 <div class="grid hide" id="detail">
 <div class="card"><h2>Data Performa</h2>
@@ -196,7 +196,7 @@ $('link').addEventListener('input',()=>{const {p,user}=parseLink($('link').value
  if(user)$('handle').value='@'+user;if(p&&type!=='keranjang'){$(p==='Instagram'?'cbIG':'cbTT').checked=true;syncPlat()}});
 ['cbIG','cbTT'].forEach(id=>$(id).addEventListener('change',()=>{syncPlat();compute()}));
 $('jenis').onchange=()=>{type=$('jenis').value;$('platBox').classList.toggle('hide',type==='keranjang');$('krjFields').classList.toggle('hide',type!=='keranjang');syncPlat();compute()};
-$('btnNext').onclick=()=>{if(!plats().length){const {p}=parseLink($('link').value);$(p==='Instagram'?'cbIG':'cbTT').checked=true;syncPlat()}$('detail').classList.remove('hide');compute()};
+if($('btnNext'))$('btnNext').onclick=()=>{if(!plats().length){const {p}=parseLink($('link').value);$(p==='Instagram'?'cbIG':'cbTT').checked=true;syncPlat()}$('detail').classList.remove('hide');compute()};
 // thousand separators
 document.querySelectorAll('#rate,#deal,#gmv,#aov').forEach(i=>i.addEventListener('input',()=>{const n=num(i.value);i.value=isFinite(n)?n.toLocaleString('id-ID'):''}));
 document.addEventListener('input',e=>{if(e.target.closest('#tab-screen')&&e.target.id!=='link')compute()});
